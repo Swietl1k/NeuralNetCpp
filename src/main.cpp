@@ -31,7 +31,7 @@ int main(int argc, char* argv[]) {
     Network network = Network(784, 10, params);
     auto start = std::chrono::high_resolution_clock::now();
 
-    network.train(X_train_wo_val, X_valid, y_train_wo_val, y_valid);
+    network.train(X_train_wo_val, X_valid, y_train_wo_val, y_valid, true);
 
     auto [test_loss, accuracy] = network.evaluate(X_test, y_test);
 

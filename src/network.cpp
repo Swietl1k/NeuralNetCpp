@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <random>
+#include <fstream>
 #include <iostream>
 
 Network::Network(int input_size, int output_size, const HyperParams& params, unsigned int seed) : params(params), gen(seed) {
@@ -28,8 +29,10 @@ std::tuple<double, double> Network::evaluate(const Eigen::MatrixXd& X, const Eig
     return {loss, accuracy};
 }
 
-void Network::train(const Eigen::MatrixXd& X, const Eigen::MatrixXd& X_val,
-                    const Eigen::MatrixXd& y, const Eigen::MatrixXd& y_val) {
+void Network::train(const Eigen::MatrixXd& X, const Eigen::MatrixXd& X_val, const Eigen::MatrixXd& y, const Eigen::MatrixXd& y_val, bool save_accuracies) {
+    std::vector<double> train_accuracies;
+    std::vector<double> val_accuracies;
+    
     int n_samples = X.rows();
     std::vector<int> indices(n_samples);
     for (int i = 0; i < n_samples; ++i) indices[i] = i;
@@ -60,14 +63,29 @@ void Network::train(const Eigen::MatrixXd& X, const Eigen::MatrixXd& X_val,
         double loss = epoch_loss / n_samples;
         double train_acc = epoch_accuracy / n_samples;  
 
-        double val_loss = cross_entropy_loss(y_val, forward(X_val, false), weights, params.regularization, params.lambda);
-        double val_acc = compute_accuracy(y_val, forward(X_val, false));
+        Eigen::MatrixXd y_val_pred = forward(X_val, false);
+        double val_loss = cross_entropy_loss(y_val, y_val_pred, weights, params.regularization, params.lambda);
+        double val_acc = compute_accuracy(y_val, y_val_pred);
+
+        if (save_accuracies) {
+            train_accuracies.push_back(train_acc);
+            val_accuracies.push_back(val_acc);
+        }
         
         std::cout << "Epoch: " << epoch + 1 
                   << " | Train Loss: " << loss
                   << " | Val Loss: " << val_loss
                   << " | Train Accuracy: " << train_acc * 100 << "%"
-                  << " | Val Accuracy: " << val_acc * 100 << "%" << std::endl;
+                  << " | Val Accuracy: " << val_acc * 100 << "%"  << std::endl;
+    }
+    
+    if (save_accuracies) {
+        std::ofstream acc_file("accuracy_log.csv");
+        acc_file << "epoch,train_acc,val_acc\n";
+        for (size_t i = 0; i < train_accuracies.size(); ++i) {
+            acc_file << (i + 1) << "," << train_accuracies[i] << "," << val_accuracies[i] << "\n";
+        }
+        acc_file.close();
     }
 }
 
@@ -106,7 +124,7 @@ Eigen::MatrixXd Network::forward(const Eigen::MatrixXd& X, bool training) {
         }
         
         activations.push_back(a);
-    }
+    }    
 
     return a;
 }

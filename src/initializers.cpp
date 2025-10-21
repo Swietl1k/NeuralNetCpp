@@ -1,6 +1,8 @@
 #include "initializers.hpp"
+
 #include <random>
 #include <cmath>
+#include <Eigen/Dense>
 
 Eigen::MatrixXd xavier_init(int out, int in) {
     double scale = std::sqrt(6.0 / (in + out));

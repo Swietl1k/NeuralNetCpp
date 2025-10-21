@@ -9,7 +9,7 @@
 class Network {
 public:
     Network(int input_size, int output_size, const HyperParams& params, unsigned int seed = std::random_device{}());
-    void train(const Eigen::MatrixXd& X, const Eigen::MatrixXd& X_val, const Eigen::MatrixXd& y, const Eigen::MatrixXd& y_val);
+    void train(const Eigen::MatrixXd& X, const Eigen::MatrixXd& X_val, const Eigen::MatrixXd& y, const Eigen::MatrixXd& y_val, bool save_accuracies = false);
     std::tuple<double, double> evaluate(const Eigen::MatrixXd& X, const Eigen::MatrixXd& y); // returns loss and accuracy
 
 private:
