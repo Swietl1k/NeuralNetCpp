@@ -20,10 +20,6 @@ add_executable(neuralnet
     src/main.cpp
     src/mnist_loader.cpp
     src/network.cpp
-    src/initializers.cpp
-    src/hyper_params.cpp
-    src/activation_functions.cpp
-    src/loss_functions.cpp
 )
 
 # include directories
@@ -31,3 +27,19 @@ target_include_directories(neuralnet PRIVATE include)
 
 # link Eigen
 target_link_libraries(neuralnet PRIVATE Eigen3::Eigen)
+
+# increase eigen stack allocation limit to 4MB (4194304 bytes)
+target_compile_definitions(neuralnet PRIVATE 
+    EIGEN_STACK_ALLOCATION_LIMIT=4194304
+)
+
+# set stack size to 16MB
+if(APPLE)
+    target_link_options(neuralnet PRIVATE 
+        -Wl,-stack_size,0x1000000
+    )
+elseif(UNIX)
+    target_link_options(neuralnet PRIVATE 
+        -Wl,-z,stack-size=16777216
+    )
+endif()

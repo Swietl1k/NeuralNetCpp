@@ -1,86 +1,97 @@
+// STATIC NETWORK
+
 #include "network.hpp"
 #include "initializers.hpp"
 #include "activation_functions.hpp"
 #include "loss_functions.hpp"
+#include "params.hpp"
 
 #include <algorithm>
 #include <random>
 #include <fstream>
 #include <iostream>
 
-Network::Network(int input_size, int output_size, const HyperParams& params, unsigned int seed) : params(params), gen(seed) {
-    build_layer_sizes(input_size, output_size);
+
+StaticNetwork::StaticNetwork(unsigned int seed) 
+    : gen(seed) {
     initialize_weights();
 }
 
-std::tuple<double, double> Network::evaluate(const Eigen::MatrixXd& X, const Eigen::MatrixXd& y) {
-    Eigen::MatrixXd y_pred = forward(X, false);
-    double loss = cross_entropy_loss(y, y_pred, weights, params.regularization, params.lambda);
-    int correct = 0;
+void StaticNetwork::train(
+    const DynamicMatrix& X,
+    const DynamicMatrix& y,
+    const DynamicMatrix& X_val,
+    const DynamicMatrix& y_val,
+    bool save_accuracies) {
 
-    for (int i = 0; i < X.rows(); i++) {
-        Eigen::Index pred_label, true_label;
-        y.row(i).maxCoeff(&true_label);
-        y_pred.row(i).maxCoeff(&pred_label);
-        if (pred_label == true_label) correct++;
-    }
+    std::vector<RealType> train_accuracies;
+    std::vector<RealType> val_accuracies;
 
-    double accuracy = static_cast<double>(correct) / X.rows();
-    return {loss, accuracy};
-}
-
-void Network::train(const Eigen::MatrixXd& X, const Eigen::MatrixXd& X_val, const Eigen::MatrixXd& y, const Eigen::MatrixXd& y_val, bool save_accuracies) {
-    std::vector<double> train_accuracies;
-    std::vector<double> val_accuracies;
-    
-    int n_samples = X.rows();
+    int n_samples = TrainSamples - ValidationSamples;
     std::vector<int> indices(n_samples);
     for (int i = 0; i < n_samples; ++i) indices[i] = i;
 
-    for (int epoch = 0; epoch < params.epochs; ++epoch) {
+    for (int epoch = 0; epoch < Epochs; ++epoch) {
         std::shuffle(indices.begin(), indices.end(), gen);
-        double epoch_loss = 0.0;
-        double epoch_accuracy = 0.0;
+        RealType epoch_loss = 0.0;
+        RealType epoch_accuracy = 0.0;
+        int num_batches = 0;    
 
-        for (int start = 0; start < n_samples; start += params.batch_size) {
-            int end = std::min(start + params.batch_size, n_samples);
-            int current_batch_size = end - start;
+        for (int start = 0; start < n_samples; start += BatchSize) {
+            if (start + BatchSize > n_samples) {
+                // Skip incomplete batch for simplicity
+                continue;
+            }
 
-            Eigen::MatrixXd X_batch(current_batch_size, X.cols());
-            Eigen::MatrixXd y_batch(current_batch_size, y.cols());
-            for (int i = 0; i < current_batch_size; ++i) {
+            MatrixT<BatchSize, InputSize> X_batch;
+            MatrixT<BatchSize, OutputSize> y_batch;
+            for (int i = 0; i < BatchSize; ++i) {
                 X_batch.row(i) = X.row(indices[start + i]);
                 y_batch.row(i) = y.row(indices[start + i]);
             }
 
-            Eigen::MatrixXd y_pred = forward(X_batch, true);
-            backward(X_batch, y_batch);
+            MatrixT<BatchSize, OutputSize> y_pred = forward(X_batch, true);
+            backward(y_batch);
 
-            epoch_loss += cross_entropy_loss(y_batch, y_pred, weights, params.regularization, params.lambda) * current_batch_size;
-            epoch_accuracy += compute_accuracy(y_batch, y_pred) * current_batch_size;
+            epoch_loss += cross_entropy_loss<BatchSize, OutputSize>(
+                y_batch, y_pred, weights, Reg, Lambda
+            ) * BatchSize;
+
+            int correct = 0;
+            for (int i = 0; i < BatchSize; ++i) {
+                Eigen::Index pred_label, true_label;
+                y_batch.row(i).maxCoeff(&true_label);
+                y_pred.row(i).maxCoeff(&pred_label);
+                if (pred_label == true_label) correct++;
+            }
+            epoch_accuracy += correct;
+            num_batches++;
         }
 
-        double loss = epoch_loss / n_samples;
-        double train_acc = epoch_accuracy / n_samples;  
+        RealType train_loss = epoch_loss / (num_batches * BatchSize);
+        RealType train_acc = epoch_accuracy / (num_batches * BatchSize);
 
-        Eigen::MatrixXd y_val_pred = forward(X_val, false);
-        double val_loss = cross_entropy_loss(y_val, y_val_pred, weights, params.regularization, params.lambda);
-        double val_acc = compute_accuracy(y_val, y_val_pred);
+        DynamicMatrix y_val_pred = forward_dynamic(X_val);
+        RealType val_loss = cross_entropy_loss_dynamic(
+            y_val, y_val_pred, weights, Reg, Lambda
+        );
+        RealType val_acc = compute_accuracy_dynamic(y_val, y_val_pred);
 
         if (save_accuracies) {
             train_accuracies.push_back(train_acc);
             val_accuracies.push_back(val_acc);
         }
-        
-        std::cout << "Epoch: " << epoch + 1 
-                  << " | Train Loss: " << loss
-                  << " | Val Loss: " << val_loss
-                  << " | Train Accuracy: " << train_acc * 100 << "%"
-                  << " | Val Accuracy: " << val_acc * 100 << "%"  << std::endl;
+
+        std::cout << "Epoch " << epoch+1
+                << " | Train Loss: " << train_loss
+                << " | Val Loss: " << val_loss
+                << " | Train Acc: " << train_acc*100 << "%"
+                << " | Val Acc: " << val_acc*100 << "%"
+                << std::endl;
     }
-    
+
     if (save_accuracies) {
-        std::ofstream acc_file("accuracy_log.csv");
+        std::ofstream acc_file("../accuracies/accuracy_log.csv");
         acc_file << "epoch,train_acc,val_acc\n";
         for (size_t i = 0; i < train_accuracies.size(); ++i) {
             acc_file << (i + 1) << "," << train_accuracies[i] << "," << val_accuracies[i] << "\n";
@@ -89,115 +100,207 @@ void Network::train(const Eigen::MatrixXd& X, const Eigen::MatrixXd& X_val, cons
     }
 }
 
-Eigen::MatrixXd Network::forward(const Eigen::MatrixXd& X, bool training) {
-    activations.clear();
-    z_values.clear();
-    dropout_masks.clear();
+std::tuple<RealType, RealType> StaticNetwork::evaluate(
+    const DynamicMatrix& X,
+    const DynamicMatrix& y) {
+    
+    DynamicMatrix y_pred = forward_dynamic(X);
+    RealType loss = cross_entropy_loss_dynamic(
+        y, y_pred, weights, Reg, Lambda
+    );
+    RealType accuracy = compute_accuracy_dynamic(y, y_pred);
+    
+    return {loss, accuracy};
+}
 
-    Eigen::MatrixXd a = X;
-    activations.push_back(a);
-    std::bernoulli_distribution dropout_dist(1.0 - params.dropout_rate);
 
-    for (size_t i = 0; i < weights.size(); i++) {
-        Eigen::MatrixXd z = ((a * weights[i].transpose()).rowwise() + biases[i].transpose());
-        z_values.push_back(z);
+MatrixT<BatchSize, OutputSize> StaticNetwork::forward(
+    const MatrixT<BatchSize, InputSize>& X, bool training) {
 
-        if (i == weights.size() - 1) {
-            a = softmax(z);
-        } else if (params.activation == Activation::ReLU) {
-            a = relu(z);
-        } else if (params.activation == Activation::Sigmoid) {
-            a = sigmoid(z);
-        } else if (params.activation == Activation::Tanh) {
-            a = tanh(z);
-        }
+    std::get<0>(activations) = X;
 
-        if (training && params.dropout_rate > 0.0 && i < weights.size() - 1) {
-            Eigen::MatrixXd mask = Eigen::MatrixXd::NullaryExpr(a.rows(), a.cols(), 
-            [&]() { return dropout_dist(gen) ? 1.0 : 0.0; });
+    // hidden layer 1
+    {
+        auto& W = std::get<0>(weights);
+        auto& b = std::get<0>(biases);
+        auto z = ((X * W.transpose()).rowwise() + b.transpose()).eval();
+        std::get<0>(z_values) = z;
 
-            a = a.array() * mask.array();
-            a /= (1.0 - params.dropout_rate);
-            dropout_masks.push_back(mask);
-        } else {
-            dropout_masks.push_back(Eigen::MatrixXd::Ones(a.rows(), a.cols()));
-        }
+        auto a = apply_activation(z, Act);
+        auto [a_dropped, mask] = apply_dropout(a, training, DropoutRate, gen);
+        std::get<0>(dropout_masks) = mask;
+        std::get<1>(activations) = a_dropped;
+    }
+
+    // hidden layer 2
+    {
+        auto& W = std::get<1>(weights);
+        auto& b = std::get<1>(biases);
+        auto& a_prev = std::get<1>(activations);
+        auto z = ((a_prev * W.transpose()).rowwise() + b.transpose()).eval();
+        std::get<1>(z_values) = z;
+
+        auto a = apply_activation(z, Act);
+        auto [a_dropped, mask] = apply_dropout(a, training, DropoutRate, gen);
+        std::get<1>(dropout_masks) = mask;
+        std::get<2>(activations) = a_dropped;
+    }
+
+    // hidden layer 3
+    {
+        auto& W = std::get<2>(weights);
+        auto& b = std::get<2>(biases);
+        auto& a_prev = std::get<2>(activations);
+        auto z = ((a_prev * W.transpose()).rowwise() + b.transpose()).eval();
+        std::get<2>(z_values) = z;
+
+        auto a = apply_activation(z, Act);
+        auto [a_dropped, mask] = apply_dropout(a, training, DropoutRate, gen);
+        std::get<2>(dropout_masks) = mask;
+        std::get<3>(activations) = a_dropped;
+    }
+
+    // output layer
+    {
+        auto& W = std::get<3>(weights);
+        auto& b = std::get<3>(biases);
+        auto& a_prev = std::get<3>(activations);
+        auto z = ((a_prev * W.transpose()).rowwise() + b.transpose()).eval();
+        std::get<3>(z_values) = z;
+
+        auto a = softmax(z);
+        std::get<3>(dropout_masks) = MatrixT<BatchSize, OutputSize>::Ones();
+        std::get<4>(activations) = a;
         
-        activations.push_back(a);
-    }    
-
-    return a;
-}
-
-void Network::backward(const Eigen::MatrixXd& X, const Eigen::MatrixXd& y) {
-    std::vector<Eigen::MatrixXd> dW(weights.size());
-    std::vector<Eigen::VectorXd> db(weights.size());
-
-    // output layer delta (softmax + cross-entropy simplification)
-    Eigen::MatrixXd delta = activations.back() - y;
-
-    for (int i = weights.size() - 1; i >= 0; --i) {
-        dW[i] = (delta.transpose() * activations[i]) / X.rows();
-        db[i] = delta.colwise().mean();
-
-        if (params.regularization == Regularization::L2) {
-            dW[i] += (params.lambda / X.rows()) * weights[i];
-        }
-        else if (params.regularization == Regularization::L1) {
-            dW[i] += (params.lambda / X.rows()) * weights[i].array().sign().matrix();
-        }
-
-        if (i > 0) {
-            Eigen::MatrixXd da = delta * weights[i];
-            da.array() *= dropout_masks[i - 1].array();
-
-            Eigen::MatrixXd dz;
-            if (params.activation == Activation::ReLU)
-                dz = da.array() * relu_derivative(z_values[i - 1]).array();
-            else if (params.activation == Activation::Sigmoid)
-                dz = da.array() * sigmoid_derivative(z_values[i - 1]).array();
-            else if (params.activation == Activation::Tanh)
-                dz = da.array() * tanh_derivative(z_values[i - 1]).array();
-
-            delta = dz;
-        }
-    }
-
-    for (size_t i = 0; i < weights.size(); ++i) {
-        weights[i] -= params.learning_rate * dW[i];
-        biases[i] -= params.learning_rate * db[i];
+        return a;
     }
 }
 
-void Network::build_layer_sizes(int input_size, int output_size) {
-    layer_sizes.clear();
-    layer_sizes.push_back(input_size);
-    for (int size : params.hidden_layers) {
-        layer_sizes.push_back(size);
-    }
-    layer_sizes.push_back(output_size);
+
+DynamicMatrix StaticNetwork::forward_dynamic(const DynamicMatrix& X) {
+    auto& W0 = std::get<0>(weights);
+    auto& b0 = std::get<0>(biases);
+    DynamicMatrix z1 = (X * W0.transpose()).rowwise() + b0.transpose();
+    DynamicMatrix a1 = apply_activation_dynamic(z1, Act);
+    
+    auto& W1 = std::get<1>(weights);
+    auto& b1 = std::get<1>(biases);
+    DynamicMatrix z2 = (a1 * W1.transpose()).rowwise() + b1.transpose();
+    DynamicMatrix a2 = apply_activation_dynamic(z2, Act);
+    
+    auto& W2 = std::get<2>(weights);
+    auto& b2 = std::get<2>(biases);
+    DynamicMatrix z3 = (a2 * W2.transpose()).rowwise() + b2.transpose();
+    DynamicMatrix a3 = apply_activation_dynamic(z3, Act);
+    
+    auto& W3 = std::get<3>(weights);
+    auto& b3 = std::get<3>(biases);
+    DynamicMatrix z_out = (a3 * W3.transpose()).rowwise() + b3.transpose();
+    DynamicMatrix a_out = softmax_dynamic(z_out);
+    
+    return a_out;
 }
 
-void Network::initialize_weights() {
-    for (size_t i = 0; i < layer_sizes.size() - 1; i++) {
-        Eigen::MatrixXd W;
-        if (params.init_type == InitType::Xavier) {
-            W = xavier_init(layer_sizes[i+1], layer_sizes[i]);
-        } else {
-            W = he_init(layer_sizes[i+1], layer_sizes[i]);
-        }
-        weights.push_back(W);
-        biases.push_back(Eigen::VectorXd::Zero(layer_sizes[i+1]));
+void StaticNetwork::backward(const MatrixT<BatchSize, OutputSize>& y) {
+    
+    MatrixT<BatchSize, OutputSize> delta_out = std::get<4>(activations) - y;
+    
+    // layer 3 -> output
+    auto& W3 = std::get<3>(weights);
+    auto& a3 = std::get<3>(activations);
+    MatrixT<OutputSize, L3> dW3 = (delta_out.transpose() * a3) / BatchSize;
+    VectorT<OutputSize> db3 = delta_out.colwise().mean();
+    if (Reg == Regularization::L2) {
+        dW3 += (Lambda / BatchSize) * W3;
     }
+    
+    // backprop to layer 3
+    MatrixT<BatchSize, L3> delta3 = delta_out * W3;
+    delta3.array() *= std::get<2>(dropout_masks).array();
+    delta3.array() *= apply_activation_derivative(std::get<2>(z_values), Act).array();
+    
+    // layer 2 -> layer 3
+    auto& W2 = std::get<2>(weights);
+    auto& a2 = std::get<2>(activations);
+    MatrixT<L3, L2> dW2 = (delta3.transpose() * a2) / BatchSize;
+    VectorT<L3> db2 = delta3.colwise().mean();
+    if (Reg == Regularization::L2) {
+        dW2 += (Lambda / BatchSize) * W2;
+    }
+    
+    // backprop to layer 2
+    MatrixT<BatchSize, L2> delta2 = delta3 * W2;
+    delta2.array() *= std::get<1>(dropout_masks).array();
+    delta2.array() *= apply_activation_derivative(std::get<1>(z_values), Act).array();
+    
+    // layer 1 -> layer 2
+    auto& W1 = std::get<1>(weights);
+    auto& a1 = std::get<1>(activations);
+    MatrixT<L2, L1> dW1 = (delta2.transpose() * a1) / BatchSize;
+    VectorT<L2> db1 = delta2.colwise().mean();
+    if (Reg == Regularization::L2) {
+        dW1 += (Lambda / BatchSize) * W1;
+    }
+    
+    // backprop to layer 1
+    MatrixT<BatchSize, L1> delta1 = delta2 * W1;
+    delta1.array() *= std::get<0>(dropout_masks).array();
+    delta1.array() *= apply_activation_derivative(std::get<0>(z_values), Act).array();
+    
+    // input -> layer 1
+    auto& W0 = std::get<0>(weights);
+    auto& a0 = std::get<0>(activations);
+    MatrixT<L1, InputSize> dW0 = (delta1.transpose() * a0) / BatchSize;
+    VectorT<L1> db0 = delta1.colwise().mean();
+    if (Reg == Regularization::L2) {
+        dW0 += (Lambda / BatchSize) * W0;
+    }
+    
+    std::get<3>(weights) -= LearningRate * dW3;
+    std::get<3>(biases) -= LearningRate * db3;
+    
+    std::get<2>(weights) -= LearningRate * dW2;
+    std::get<2>(biases) -= LearningRate * db2;
+    
+    std::get<1>(weights) -= LearningRate * dW1;
+    std::get<1>(biases) -= LearningRate * db1;
+    
+    std::get<0>(weights) -= LearningRate * dW0;
+    std::get<0>(biases) -= LearningRate * db0;
 }
 
-double Network::compute_accuracy(const Eigen::MatrixXd& y_true, const Eigen::MatrixXd& y_pred) {
+void StaticNetwork::initialize_weights() {
+    if (Init == InitType::Xavier) {
+        std::get<0>(weights) = xavier_init<L1, InputSize>(gen);
+        std::get<1>(weights) = xavier_init<L2, L1>(gen);
+        std::get<2>(weights) = xavier_init<L3, L2>(gen);
+        std::get<3>(weights) = xavier_init<OutputSize, L3>(gen);
+    } else {
+        std::get<0>(weights) = he_init<L1, InputSize>(gen);
+        std::get<1>(weights) = he_init<L2, L1>(gen);
+        std::get<2>(weights) = he_init<L3, L2>(gen);
+        std::get<3>(weights) = he_init<OutputSize, L3>(gen);
+    }
+    
+    std::get<0>(biases) = VectorT<L1>::Zero();
+    std::get<1>(biases) = VectorT<L2>::Zero();
+    std::get<2>(biases) = VectorT<L3>::Zero();
+    std::get<3>(biases) = VectorT<OutputSize>::Zero();
+}
+
+RealType StaticNetwork::compute_accuracy_dynamic(
+    const DynamicMatrix& y_true,
+    const DynamicMatrix& y_pred) {
+    
     int correct = 0;
-    for (int i = 0; i < y_true.rows(); i++) {
+    int n_samples = y_true.rows();
+    
+    for (int i = 0; i < n_samples; i++) {
         Eigen::Index pred_label, true_label;
         y_true.row(i).maxCoeff(&true_label);
         y_pred.row(i).maxCoeff(&pred_label);
         if (pred_label == true_label) correct++;
     }
-    return static_cast<double>(correct) / y_true.rows();
+    
+    return static_cast<RealType>(correct) / n_samples;
 }
