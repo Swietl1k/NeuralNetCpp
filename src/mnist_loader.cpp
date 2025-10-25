@@ -1,4 +1,5 @@
 #include "mnist_loader.hpp"
+#include "types.hpp"
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
@@ -6,7 +7,7 @@
 #include <string>
 #include <iostream>
 
-std::tuple<Eigen::MatrixXd, Eigen::MatrixXd> load_fashion_mnist_csv(const std::string& filename) {
+std::tuple<DynamicMatrix, DynamicMatrix> load_fashion_mnist_csv(const std::string& filename) {
     std::ifstream file(filename);
     if (!file.is_open()) {
         throw std::runtime_error("Could not open file: " + filename);
@@ -19,7 +20,7 @@ std::tuple<Eigen::MatrixXd, Eigen::MatrixXd> load_fashion_mnist_csv(const std::s
     }
 
     std::vector<int> labels;
-    std::vector<std::vector<double>> pixels_data;
+    std::vector<std::vector<RealType>> pixels_data;
 
     while (std::getline(file, line)) {
         std::stringstream ss(line);
@@ -31,12 +32,12 @@ std::tuple<Eigen::MatrixXd, Eigen::MatrixXd> load_fashion_mnist_csv(const std::s
         int label = std::stoi(value);
         labels.push_back(label);
 
-        std::vector<double> pixels(784);
+        std::vector<RealType> pixels(784);
         for (int i = 0; i < 784; i++) {
             if (!std::getline(ss, value, ',')) {
                 throw std::runtime_error("Unexpected end of row in " + filename);
             }
-            pixels[i] = std::stod(value) / 255.0; // normalize to [0,1]
+            pixels[i] = static_cast<RealType>(std::stod(value)) / 255.0f; // normalize to [0,1]
         }
 
         pixels_data.push_back(std::move(pixels));
@@ -45,8 +46,8 @@ std::tuple<Eigen::MatrixXd, Eigen::MatrixXd> load_fashion_mnist_csv(const std::s
     std::cout << "Loaded " << labels.size() << " samples from " << filename << std::endl;
 
     size_t num_samples = labels.size();
-    Eigen::MatrixXd X(num_samples, 784);
-    Eigen::MatrixXd Y = Eigen::MatrixXd::Zero(num_samples, 10);
+    DynamicMatrix X(num_samples, 784);
+    DynamicMatrix Y = DynamicMatrix::Zero(num_samples, 10);
 
     for (size_t i = 0; i < num_samples; i++) {
         for (int j = 0; j < 784; j++) {

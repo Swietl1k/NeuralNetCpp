@@ -2,6 +2,7 @@
 #include "initializers.hpp"
 #include "activation_functions.hpp"
 #include "loss_functions.hpp"
+#include "types.hpp"
 
 #include <algorithm>
 #include <random>
@@ -13,9 +14,9 @@ Network::Network(int input_size, int output_size, const HyperParams& params, uns
     initialize_weights();
 }
 
-std::tuple<double, double> Network::evaluate(const Eigen::MatrixXd& X, const Eigen::MatrixXd& y) {
-    Eigen::MatrixXd y_pred = forward(X, false);
-    double loss = cross_entropy_loss(y, y_pred, weights, params.regularization, params.lambda);
+std::tuple<RealType, RealType> Network::evaluate(const DynamicMatrix& X, const DynamicMatrix& y) {
+    DynamicMatrix y_pred = forward(X, false);
+    RealType loss = cross_entropy_loss(y, y_pred, weights, params.regularization, params.lambda);
     int correct = 0;
 
     for (int i = 0; i < X.rows(); i++) {
@@ -25,13 +26,13 @@ std::tuple<double, double> Network::evaluate(const Eigen::MatrixXd& X, const Eig
         if (pred_label == true_label) correct++;
     }
 
-    double accuracy = static_cast<double>(correct) / X.rows();
+    RealType accuracy = static_cast<RealType>(correct) / X.rows();
     return {loss, accuracy};
 }
 
-void Network::train(const Eigen::MatrixXd& X, const Eigen::MatrixXd& X_val, const Eigen::MatrixXd& y, const Eigen::MatrixXd& y_val, bool save_accuracies) {
-    std::vector<double> train_accuracies;
-    std::vector<double> val_accuracies;
+void Network::train(const DynamicMatrix& X, const DynamicMatrix& X_val, const DynamicMatrix& y, const DynamicMatrix& y_val, bool save_accuracies) {
+    std::vector<RealType> train_accuracies;
+    std::vector<RealType> val_accuracies;
     
     int n_samples = X.rows();
     std::vector<int> indices(n_samples);
@@ -39,33 +40,33 @@ void Network::train(const Eigen::MatrixXd& X, const Eigen::MatrixXd& X_val, cons
 
     for (int epoch = 0; epoch < params.epochs; ++epoch) {
         std::shuffle(indices.begin(), indices.end(), gen);
-        double epoch_loss = 0.0;
-        double epoch_accuracy = 0.0;
+        RealType epoch_loss = 0.0;
+        RealType epoch_accuracy = 0.0;
 
         for (int start = 0; start < n_samples; start += params.batch_size) {
             int end = std::min(start + params.batch_size, n_samples);
             int current_batch_size = end - start;
 
-            Eigen::MatrixXd X_batch(current_batch_size, X.cols());
-            Eigen::MatrixXd y_batch(current_batch_size, y.cols());
+            DynamicMatrix X_batch(current_batch_size, X.cols());
+            DynamicMatrix y_batch(current_batch_size, y.cols());
             for (int i = 0; i < current_batch_size; ++i) {
                 X_batch.row(i) = X.row(indices[start + i]);
                 y_batch.row(i) = y.row(indices[start + i]);
             }
 
-            Eigen::MatrixXd y_pred = forward(X_batch, true);
+            DynamicMatrix y_pred = forward(X_batch, true);
             backward(X_batch, y_batch);
 
             epoch_loss += cross_entropy_loss(y_batch, y_pred, weights, params.regularization, params.lambda) * current_batch_size;
             epoch_accuracy += compute_accuracy(y_batch, y_pred) * current_batch_size;
         }
 
-        double loss = epoch_loss / n_samples;
-        double train_acc = epoch_accuracy / n_samples;  
+        RealType loss = epoch_loss / n_samples;
+        RealType train_acc = epoch_accuracy / n_samples;  
 
-        Eigen::MatrixXd y_val_pred = forward(X_val, false);
-        double val_loss = cross_entropy_loss(y_val, y_val_pred, weights, params.regularization, params.lambda);
-        double val_acc = compute_accuracy(y_val, y_val_pred);
+        DynamicMatrix y_val_pred = forward(X_val, false);
+        RealType val_loss = cross_entropy_loss(y_val, y_val_pred, weights, params.regularization, params.lambda);
+        RealType val_acc = compute_accuracy(y_val, y_val_pred);
 
         if (save_accuracies) {
             train_accuracies.push_back(train_acc);
@@ -89,17 +90,17 @@ void Network::train(const Eigen::MatrixXd& X, const Eigen::MatrixXd& X_val, cons
     }
 }
 
-Eigen::MatrixXd Network::forward(const Eigen::MatrixXd& X, bool training) {
+DynamicMatrix Network::forward(const DynamicMatrix& X, bool training) {
     activations.clear();
     z_values.clear();
     dropout_masks.clear();
 
-    Eigen::MatrixXd a = X;
+    DynamicMatrix a = X;
     activations.push_back(a);
     std::bernoulli_distribution dropout_dist(1.0 - params.dropout_rate);
 
     for (size_t i = 0; i < weights.size(); i++) {
-        Eigen::MatrixXd z = ((a * weights[i].transpose()).rowwise() + biases[i].transpose());
+        DynamicMatrix z = ((a * weights[i].transpose()).rowwise() + biases[i].transpose());
         z_values.push_back(z);
 
         if (i == weights.size() - 1) {
@@ -113,14 +114,14 @@ Eigen::MatrixXd Network::forward(const Eigen::MatrixXd& X, bool training) {
         }
 
         if (training && params.dropout_rate > 0.0 && i < weights.size() - 1) {
-            Eigen::MatrixXd mask = Eigen::MatrixXd::NullaryExpr(a.rows(), a.cols(), 
+            DynamicMatrix mask = DynamicMatrix::NullaryExpr(a.rows(), a.cols(), 
             [&]() { return dropout_dist(gen) ? 1.0 : 0.0; });
 
             a = a.array() * mask.array();
             a /= (1.0 - params.dropout_rate);
             dropout_masks.push_back(mask);
         } else {
-            dropout_masks.push_back(Eigen::MatrixXd::Ones(a.rows(), a.cols()));
+            dropout_masks.push_back(DynamicMatrix::Ones(a.rows(), a.cols()));
         }
         
         activations.push_back(a);
@@ -129,12 +130,12 @@ Eigen::MatrixXd Network::forward(const Eigen::MatrixXd& X, bool training) {
     return a;
 }
 
-void Network::backward(const Eigen::MatrixXd& X, const Eigen::MatrixXd& y) {
-    std::vector<Eigen::MatrixXd> dW(weights.size());
-    std::vector<Eigen::VectorXd> db(weights.size());
+void Network::backward(const DynamicMatrix& X, const DynamicMatrix& y) {
+    std::vector<DynamicMatrix> dW(weights.size());
+    std::vector<DynamicVector> db(weights.size());
 
     // output layer delta (softmax + cross-entropy simplification)
-    Eigen::MatrixXd delta = activations.back() - y;
+    DynamicMatrix delta = activations.back() - y;
 
     for (int i = weights.size() - 1; i >= 0; --i) {
         dW[i] = (delta.transpose() * activations[i]) / X.rows();
@@ -148,10 +149,10 @@ void Network::backward(const Eigen::MatrixXd& X, const Eigen::MatrixXd& y) {
         }
 
         if (i > 0) {
-            Eigen::MatrixXd da = delta * weights[i];
+            DynamicMatrix da = delta * weights[i];
             da.array() *= dropout_masks[i - 1].array();
 
-            Eigen::MatrixXd dz;
+            DynamicMatrix dz;
             if (params.activation == Activation::ReLU)
                 dz = da.array() * relu_derivative(z_values[i - 1]).array();
             else if (params.activation == Activation::Sigmoid)
@@ -180,18 +181,18 @@ void Network::build_layer_sizes(int input_size, int output_size) {
 
 void Network::initialize_weights() {
     for (size_t i = 0; i < layer_sizes.size() - 1; i++) {
-        Eigen::MatrixXd W;
+        DynamicMatrix W;
         if (params.init_type == InitType::Xavier) {
             W = xavier_init(layer_sizes[i+1], layer_sizes[i]);
         } else {
             W = he_init(layer_sizes[i+1], layer_sizes[i]);
         }
         weights.push_back(W);
-        biases.push_back(Eigen::VectorXd::Zero(layer_sizes[i+1]));
+        biases.push_back(DynamicVector::Zero(layer_sizes[i+1]));
     }
 }
 
-double Network::compute_accuracy(const Eigen::MatrixXd& y_true, const Eigen::MatrixXd& y_pred) {
+RealType Network::compute_accuracy(const DynamicMatrix& y_true, const DynamicMatrix& y_pred) {
     int correct = 0;
     for (int i = 0; i < y_true.rows(); i++) {
         Eigen::Index pred_label, true_label;
@@ -199,5 +200,5 @@ double Network::compute_accuracy(const Eigen::MatrixXd& y_true, const Eigen::Mat
         y_pred.row(i).maxCoeff(&pred_label);
         if (pred_label == true_label) correct++;
     }
-    return static_cast<double>(correct) / y_true.rows();
+    return static_cast<RealType>(correct) / y_true.rows();
 }

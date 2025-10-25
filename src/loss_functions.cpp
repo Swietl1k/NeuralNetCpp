@@ -1,19 +1,19 @@
 #include "loss_functions.hpp"
-
+#include "types.hpp"
 #include <Eigen/Dense>
 
-double cross_entropy_loss(
-    const Eigen::MatrixXd& y_true,
-    const Eigen::MatrixXd& y_pred,
-    const std::vector<Eigen::MatrixXd>& weights,
+RealType cross_entropy_loss(
+    const DynamicMatrix& y_true,
+    const DynamicMatrix& y_pred,
+    const std::vector<DynamicMatrix>& weights,
     Regularization reg,
-    double lambda) {
+    RealType lambda) {
 
     // lower bound epsilon clipping to avoid log(0)
-    Eigen::MatrixXd y_clipped = y_pred.array().max(1e-12);
-    double loss = -(y_true.array() * y_clipped.array().log()).rowwise().sum().mean();
+    DynamicMatrix y_clipped = y_pred.array().max(1e-12);
+    RealType loss = -(y_true.array() * y_clipped.array().log()).rowwise().sum().mean();
 
-    double reg_term = 0.0;
+    RealType reg_term = 0.0;
     if (reg == Regularization::L2) {
         for (const auto& W : weights) {
             reg_term += (W.array().square().sum());
@@ -29,6 +29,6 @@ double cross_entropy_loss(
     return loss + reg_term;
 }
 
-Eigen::MatrixXd cross_entropy_gradient(const Eigen::MatrixXd& y_true, const Eigen::MatrixXd& y_pred) {
+DynamicMatrix cross_entropy_gradient(const DynamicMatrix& y_true, const DynamicMatrix& y_pred) {
     return (y_pred - y_true) / y_true.rows(); // simplified gradient for softmax + cross-entropy
 }

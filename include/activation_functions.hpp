@@ -1,12 +1,13 @@
 #pragma once
 
+#include "types.hpp"
 #include <Eigen/Dense>
 
-Eigen::MatrixXd relu(const Eigen::MatrixXd& z);
-Eigen::MatrixXd relu_derivative(const Eigen::MatrixXd& z);
-Eigen::MatrixXd sigmoid(const Eigen::MatrixXd& z);
-Eigen::MatrixXd sigmoid_derivative(const Eigen::MatrixXd& z);
-Eigen::MatrixXd tanh(const Eigen::MatrixXd& z);
-Eigen::MatrixXd tanh_derivative(const Eigen::MatrixXd& z);
-Eigen::MatrixXd softmax(const Eigen::MatrixXd& z);  
-Eigen::MatrixXd softmax_derivative(const Eigen::MatrixXd& z);
+DynamicMatrix relu(const DynamicMatrix& z);
+DynamicMatrix relu_derivative(const DynamicMatrix& z);
+DynamicMatrix sigmoid(const DynamicMatrix& z);
+DynamicMatrix sigmoid_derivative(const DynamicMatrix& z);
+DynamicMatrix tanh(const DynamicMatrix& z);
+DynamicMatrix tanh_derivative(const DynamicMatrix& z);
+DynamicMatrix softmax(const DynamicMatrix& z);  
+DynamicMatrix softmax_derivative(const DynamicMatrix& z);

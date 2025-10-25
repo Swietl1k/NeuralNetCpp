@@ -1,7 +1,8 @@
 #pragma once
 
-#include <Eigen/Dense>
 #include "hyper_params.hpp"
+#include "types.hpp"
+#include <Eigen/Dense>
 
-double cross_entropy_loss(const Eigen::MatrixXd& y_true, const Eigen::MatrixXd& y_pred, const std::vector<Eigen::MatrixXd>& weights, Regularization reg = Regularization::None, double lambda = 0.0);
-Eigen::MatrixXd cross_entropy_gradient(const Eigen::MatrixXd& y_true, const Eigen::MatrixXd& y_pred);
+RealType cross_entropy_loss(const DynamicMatrix& y_true, const DynamicMatrix& y_pred, const std::vector<DynamicMatrix>& weights, Regularization reg = Regularization::None, RealType lambda = 0.0);
+DynamicMatrix cross_entropy_gradient(const DynamicMatrix& y_true, const DynamicMatrix& y_pred);

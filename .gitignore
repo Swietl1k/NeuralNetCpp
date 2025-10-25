@@ -9,3 +9,6 @@
 
 #exclude datasets
 /mnist/ 
+
+/venv/
+/accuracies/

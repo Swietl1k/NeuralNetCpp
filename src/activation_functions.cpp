@@ -1,17 +1,18 @@
 #include "activation_functions.hpp"
+#include "types.hpp"
 #include <cmath>
 
 
-Eigen::MatrixXd relu(const Eigen::MatrixXd& z) {
+DynamicMatrix relu(const DynamicMatrix& z) {
     return z.cwiseMax(0.0);
 }
 
-Eigen::MatrixXd relu_derivative(const Eigen::MatrixXd& z) {
-    return (z.array() > 0.0).cast<double>();
+DynamicMatrix relu_derivative(const DynamicMatrix& z) {
+    return (z.array() > 0.0).cast<RealType>();
 }
 
 
-Eigen::MatrixXd sigmoid(const Eigen::MatrixXd& z) {
+DynamicMatrix sigmoid(const DynamicMatrix& z) {
     // numerically stable sigmoid computation
     return (z.array() >= 0).select(
         1.0 / (1.0 + (-z.array()).exp()),         // for z >= 0
@@ -19,26 +20,26 @@ Eigen::MatrixXd sigmoid(const Eigen::MatrixXd& z) {
     );
 }
 
-Eigen::MatrixXd sigmoid_derivative(const Eigen::MatrixXd& z) {
+DynamicMatrix sigmoid_derivative(const DynamicMatrix& z) {
     return sigmoid(z).array() * (1.0 - sigmoid(z).array());
 }
 
 
-Eigen::MatrixXd tanh(const Eigen::MatrixXd& z) {
+DynamicMatrix tanh(const DynamicMatrix& z) {
     return z.array().tanh();
 }
 
-Eigen::MatrixXd tanh_derivative(const Eigen::MatrixXd& z) {
+DynamicMatrix tanh_derivative(const DynamicMatrix& z) {
     return 1.0 - z.array().tanh().square();
 }
 
 
-Eigen::MatrixXd softmax(const Eigen::MatrixXd& z) {
-    Eigen::MatrixXd shifted = z;
-    Eigen::VectorXd row_max = z.rowwise().maxCoeff();
+DynamicMatrix softmax(const DynamicMatrix& z) {
+    DynamicMatrix shifted = z;
+    DynamicVector row_max = z.rowwise().maxCoeff();
     shifted = (shifted.colwise() - row_max); // subtract max per row to avoid overflow
 
-    Eigen::MatrixXd exp_z = shifted.array().exp();
-    Eigen::VectorXd sum_exp = exp_z.rowwise().sum();
+    DynamicMatrix exp_z = shifted.array().exp();
+    DynamicVector sum_exp = exp_z.rowwise().sum();
     return exp_z.array().colwise() / sum_exp.array();
 }

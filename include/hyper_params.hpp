@@ -1,4 +1,6 @@
 #pragma once
+
+#include "types.hpp"
 #include <string>
 #include <vector>
 
@@ -13,8 +15,8 @@ struct HyperParams {
     double learning_rate = 0.01;
     int epochs = 50;
     int batch_size = 32;
-    double lambda = 0.001;
-    double dropout_rate = 0.0;
+    RealType lambda = 0.001;
+    RealType dropout_rate = 0.0;
     Regularization regularization = Regularization::L2;
     InitType init_type = InitType::He;
     Activation activation = Activation::ReLU;

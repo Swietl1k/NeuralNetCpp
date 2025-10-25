@@ -1,17 +1,17 @@
 #include "initializers.hpp"
-
+#include "types.hpp"
 #include <random>
 #include <cmath>
 #include <Eigen/Dense>
 
-Eigen::MatrixXd xavier_init(int out, int in) {
-    double scale = std::sqrt(6.0 / (in + out));
-    return Eigen::MatrixXd::Random(out, in) * scale;
+DynamicMatrix xavier_init(int out, int in) {
+    RealType scale = std::sqrt(6.0 / (in + out));
+    return DynamicMatrix::Random(out, in) * scale;
 }
 
-Eigen::MatrixXd he_init(int out, int in) {
-    double scale = std::sqrt(2.0 / in);
+DynamicMatrix he_init(int out, int in) {
+    RealType scale = std::sqrt(RealType(2.0) / in);
     std::mt19937 gen(std::random_device{}());
-    std::normal_distribution<double> normal_dist(0, scale);
-    return Eigen::MatrixXd::NullaryExpr(out, in, [&]() { return normal_dist(gen); });
+    std::normal_distribution<RealType> normal_dist(0, scale);
+    return DynamicMatrix::NullaryExpr(out, in, [&]() { return normal_dist(gen); });
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "types.hpp"
 #include "hyper_params.hpp"
 #include <Eigen/Dense>
 #include <vector>
@@ -9,22 +10,22 @@
 class Network {
 public:
     Network(int input_size, int output_size, const HyperParams& params, unsigned int seed = std::random_device{}());
-    void train(const Eigen::MatrixXd& X, const Eigen::MatrixXd& X_val, const Eigen::MatrixXd& y, const Eigen::MatrixXd& y_val, bool save_accuracies = false);
-    std::tuple<double, double> evaluate(const Eigen::MatrixXd& X, const Eigen::MatrixXd& y); // returns loss and accuracy
+    void train(const DynamicMatrix& X, const DynamicMatrix& X_val, const DynamicMatrix& y, const DynamicMatrix& y_val, bool save_accuracies = false);
+    std::tuple<RealType, RealType> evaluate(const DynamicMatrix& X, const DynamicMatrix& y); // returns loss and accuracy
 
 private:
     HyperParams params;
     std::vector<int> layer_sizes;
-    std::vector<Eigen::MatrixXd> weights; // W[i]: weights between layer i and i+1
-    std::vector<Eigen::VectorXd> biases;
-    std::vector<Eigen::MatrixXd> activations; 
-    std::vector<Eigen::MatrixXd> z_values; // pre-activation values
-    std::vector<Eigen::MatrixXd> dropout_masks;
+    std::vector<DynamicMatrix> weights; // W[i]: weights between layer i and i+1
+    std::vector<DynamicVector> biases;
+    std::vector<DynamicMatrix> activations; 
+    std::vector<DynamicMatrix> z_values; // pre-activation values
+    std::vector<DynamicMatrix> dropout_masks;
     std::mt19937 gen{std::random_device{}()};
 
-    Eigen::MatrixXd forward(const Eigen::MatrixXd& X, bool training); // returns output layer activations
-    void backward(const Eigen::MatrixXd& X, const Eigen::MatrixXd& y);    
+    DynamicMatrix forward(const DynamicMatrix& X, bool training); // returns output layer activations
+    void backward(const DynamicMatrix& X, const DynamicMatrix& y);    
     void build_layer_sizes(int input_size, int output_size);
     void initialize_weights();
-    double compute_accuracy(const Eigen::MatrixXd& y_true, const Eigen::MatrixXd& y_pred);
+    RealType compute_accuracy(const DynamicMatrix& y_true, const DynamicMatrix& y_pred);
 };

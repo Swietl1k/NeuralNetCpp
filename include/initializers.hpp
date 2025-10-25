@@ -1,6 +1,7 @@
 #pragma once
 
+#include "types.hpp"
 #include <Eigen/Dense>
 
-Eigen::MatrixXd xavier_init(int out, int in);
-Eigen::MatrixXd he_init(int out, int in);
+DynamicMatrix xavier_init(int out, int in);
+DynamicMatrix he_init(int out, int in);

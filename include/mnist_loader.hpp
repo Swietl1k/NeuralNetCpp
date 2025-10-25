@@ -1,7 +1,8 @@
 #pragma once 
 
+#include "types.hpp"
 #include <Eigen/Dense>
 #include <string>
 #include <tuple>
 
-std::tuple<Eigen::MatrixXd, Eigen::MatrixXd> load_fashion_mnist_csv(const std::string& filename);
+std::tuple<DynamicMatrix, DynamicMatrix> load_fashion_mnist_csv(const std::string& filename);
