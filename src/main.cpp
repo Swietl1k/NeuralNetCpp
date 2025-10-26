@@ -10,12 +10,16 @@
 
 int main(int argc, char* argv[]) {
     HyperParams params;
+    std::string output_file;
+    unsigned int seed = 123;
     if (argc > 1) params.hidden_layers = parse_hidden_layers(argv[1]);
-    if (argc > 2) params.learning_rate = static_cast<RealType>(std::stod(argv[5]));
+    if (argc > 2) params.learning_rate = static_cast<RealType>(std::stod(argv[2]));
     if (argc > 3) params.epochs = std::stoi(argv[3]);
     if (argc > 4) params.batch_size = std::stoi(argv[4]);
     if (argc > 5) params.lambda = static_cast<RealType>(std::stod(argv[5]));
-    if (argc > 6) params.dropout_rate = static_cast<RealType>(std::stod(argv[5]));
+    if (argc > 6) params.dropout_rate = static_cast<RealType>(std::stod(argv[6]));
+    if (argc > 7) seed = std::stoi(argv[7]);
+    if (argc > 8) output_file = argv[8];
 
     std::string train_data = "../mnist/fashion-mnist_train.csv";
     std::string test_data = "../mnist/fashion-mnist_test.csv";
@@ -28,11 +32,11 @@ int main(int argc, char* argv[]) {
     DynamicMatrix y_valid = y_train.topRows(n_val);
     DynamicMatrix X_train_wo_val = X_train.bottomRows(X_train.rows() - n_val);
     DynamicMatrix y_train_wo_val = y_train.bottomRows(y_train.rows() - n_val);
- 
-    Network network = Network(784, 10, params);
+
+    Network network = Network(784, 10, params, seed);
     auto start = std::chrono::high_resolution_clock::now();
 
-    network.train(X_train_wo_val, X_valid, y_train_wo_val, y_valid, true);
+    network.train(X_train_wo_val, X_valid, y_train_wo_val, y_valid, true, output_file);
 
     auto [test_loss, accuracy] = network.evaluate(X_test, y_test);
 

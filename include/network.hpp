@@ -10,7 +10,7 @@
 class Network {
 public:
     Network(int input_size, int output_size, const HyperParams& params, unsigned int seed = std::random_device{}());
-    void train(const DynamicMatrix& X, const DynamicMatrix& X_val, const DynamicMatrix& y, const DynamicMatrix& y_val, bool save_accuracies = false);
+    void train(const DynamicMatrix& X, const DynamicMatrix& X_val, const DynamicMatrix& y, const DynamicMatrix& y_val, bool save_accuracies = false, const std::string& output_filename = "accuracy_log.csv");
     std::tuple<RealType, RealType> evaluate(const DynamicMatrix& X, const DynamicMatrix& y); // returns loss and accuracy
 
 private:
@@ -21,7 +21,7 @@ private:
     std::vector<DynamicMatrix> activations; 
     std::vector<DynamicMatrix> z_values; // pre-activation values
     std::vector<DynamicMatrix> dropout_masks;
-    std::mt19937 gen{std::random_device{}()};
+    std::mt19937 gen;
 
     DynamicMatrix forward(const DynamicMatrix& X, bool training); // returns output layer activations
     void backward(const DynamicMatrix& X, const DynamicMatrix& y);    

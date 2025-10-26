@@ -30,7 +30,8 @@ std::tuple<RealType, RealType> Network::evaluate(const DynamicMatrix& X, const D
     return {loss, accuracy};
 }
 
-void Network::train(const DynamicMatrix& X, const DynamicMatrix& X_val, const DynamicMatrix& y, const DynamicMatrix& y_val, bool save_accuracies) {
+void Network::train(const DynamicMatrix& X, const DynamicMatrix& X_val, const DynamicMatrix& y, const DynamicMatrix& y_val, bool save_accuracies, const std::string& output_filename) {
+    std::string output_path = "../accuracies/" + output_filename;
     std::vector<RealType> train_accuracies;
     std::vector<RealType> val_accuracies;
     
@@ -81,7 +82,7 @@ void Network::train(const DynamicMatrix& X, const DynamicMatrix& X_val, const Dy
     }
     
     if (save_accuracies) {
-        std::ofstream acc_file("accuracy_log.csv");
+        std::ofstream acc_file(output_path);
         acc_file << "epoch,train_acc,val_acc\n";
         for (size_t i = 0; i < train_accuracies.size(); ++i) {
             acc_file << (i + 1) << "," << train_accuracies[i] << "," << val_accuracies[i] << "\n";
@@ -183,9 +184,9 @@ void Network::initialize_weights() {
     for (size_t i = 0; i < layer_sizes.size() - 1; i++) {
         DynamicMatrix W;
         if (params.init_type == InitType::Xavier) {
-            W = xavier_init(layer_sizes[i+1], layer_sizes[i]);
+            W = xavier_init(layer_sizes[i+1], layer_sizes[i], gen);
         } else {
-            W = he_init(layer_sizes[i+1], layer_sizes[i]);
+            W = he_init(layer_sizes[i+1], layer_sizes[i], gen);
         }
         weights.push_back(W);
         biases.push_back(DynamicVector::Zero(layer_sizes[i+1]));
